@@ -25,6 +25,8 @@
 
 uint16_t conn_handle = BLE_CONN_HANDLE_INVALID;
 
+volatile bool armed = false;
+
 // Intervals for advertising and connections
 simple_ble_config_t ble_config = {
   .platform_id       = 0x00,                // used as 4th octect in device BLE address
@@ -91,7 +93,14 @@ void services_init (void) {
  ******************************************************************************/
 
 
-// static void ipc_callback(int pid, int len, int buf, __attribute__ ((unused)) void* ud) {
+static void ipc_callback(int pid, int len, int buf, __attribute__ ((unused)) void* ud) {
+    printf("%d %d 0x%08x\n", pid, len, buf);
+
+    if (!btn_ctrl_tx_arm(pid, buf)) {
+        printf("Error! Already armed!\n");
+    } else {
+        printf("Armed!\n");
+    }
 //   if (len < (int) sizeof(sensor_update_t)) {
 //     printf("Error! IPC message too short.\n");
 //     ipc_notify_client(pid);
@@ -114,7 +123,7 @@ void services_init (void) {
 //     }
 //   }
 //   ipc_notify_client(pid);
-// }
+}
 
 /*******************************************************************************
  * MAIN
@@ -124,14 +133,14 @@ int main (void) {
  printf("[BLE] Buttons IPC Service\n");
 //
 //  // Listen for IPC requests to configure the sensor values.
-//  ipc_register_svc(ipc_callback, NULL);
+ ipc_register_svc(ipc_callback, NULL);
 //
  // Setup BLE
  conn_handle = simple_ble_init(&ble_config)->conn_handle;
 //
  // Advertise the BLE environmental sensing service.
  ble_uuid_t adv_uuid = {
-   .uuid = 0x0101,
+   .uuid = 0x0101, // TODO advertise custom
    .type = BLE_UUID_TYPE_BLE
  };
  simple_adv_service(&adv_uuid);

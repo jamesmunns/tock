@@ -4,12 +4,27 @@
 #include <app_error.h>
 #include <ble.h>
 
+#include <ipc.h>
+
 #include "led_ctrl_service.h"
 
 static uint16_t service_handle;
 
 static ble_gatts_char_handles_t btn_char_handle;
 static led_update_t led_update_buffer;
+
+static volatile int g_pid = 0;
+static volatile int g_buf = 0;
+
+bool btn_ctrl_tx_arm(int pid, int buf) {
+    if ((g_pid != 0) || (g_buf != 0)) {
+        return false;
+    } else {
+        g_pid = pid;
+        g_buf = buf;
+        return true;
+    }
+}
 
 void btn_ctrl_service_init(void) {
   uint32_t   err_code;
@@ -66,6 +81,9 @@ void btn_ctrl_service_init(void) {
                                              &attr_char_value,
                                              &btn_char_handle);
   APP_ERROR_CHECK(err_code);
+
+  g_buf = 0;
+  g_pid = 0;
 }
 
 void btn_ctrl_handle_write(ble_gatts_evt_write_t* context) {
@@ -81,7 +99,14 @@ void btn_ctrl_handle_write(ble_gatts_evt_write_t* context) {
 
       // TODO - send this somewhere over IPC
       printf("GOT BLE: %02X %02X\n", updt.led_id, updt.cmd);
-      (void)updt;
+
+      if((g_pid != 0) && (g_buf != 0)) {
+          int pid = g_pid;
+          *(led_update_t*)g_buf = updt;
+          g_buf = 0;
+          g_pid = 0;
+          ipc_notify_client(pid);
+      }
   }
 }
 
